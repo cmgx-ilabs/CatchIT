@@ -47,6 +47,14 @@ _NOTE:_ Commits and pull requests to FINOS repositories will only be accepted fr
 *Need an ICLA? Unsure if you are covered under an existing CCLA? Email [help@finos.org](mailto:help@finos.org)*
 
 
+## CMG Usage
+
+We added some additional options. Example of usage:
+
+```shell
+$ python3 catchit.py --scan-path ~/build/GitHub  --ignore-case --timeout=200 --include="*.env"  --include="*.txt"
+```
+
 ## License
 
 Copyright 2021 Goldman Sachs

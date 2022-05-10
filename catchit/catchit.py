@@ -47,10 +47,10 @@ def check_operating_system():
 
 # Parsing the findings from grep subprocess output and returning the refined findings
 def getFinding_GREP(
-    proc: subprocess.CompletedProcess,
-    scanning_path: str,
-    confidence: float = 0.4,
-    entropy: float = 0,
+        proc: subprocess.CompletedProcess,
+        scanning_path: str,
+        confidence: float = 0.4,
+        entropy: float = 0,
 ) -> List[Dict]:
     logger.info("Starting getFinding_grep")
 
@@ -78,8 +78,8 @@ def getFinding_GREP(
                 finding["match"] = str(":".join(out_line[2:]))
             catchit_output.summary["findings"]["code"] += 1
             if (
-                confidence >= 0.5
-                and shannon_entropy(out_line[2], BASE64_CHARS) > entropy
+                    confidence >= 0.5
+                    and shannon_entropy(out_line[2], BASE64_CHARS) > entropy
             ):
                 catchit_output.summary["findings"]["blocking_code"] += 1
                 finding["type"] = "Blocking"
@@ -95,7 +95,7 @@ def getFinding_GREP(
 
 # Parsing the findings from find subprocess output and returning the refined findings
 def getFinding_FIND(
-    proc: subprocess.CompletedProcess, scanning_path: str, confidence: float = 0.4
+        proc: subprocess.CompletedProcess, scanning_path: str, confidence: float = 0.4
 ) -> List[Dict]:
     logger.info("Starting getFinding_find")
 
@@ -103,7 +103,7 @@ def getFinding_FIND(
         findings = []
         proc_output = proc.stdout.decode("utf-8").split("\n")
         for line in proc_output:
-            finding = {}
+            finding: dict[str, str] = {}
             out_line = line.split(":")
             if len(out_line[0]) == 0:
                 break
@@ -157,10 +157,12 @@ def exec_grep(regexs_json: Dict, scanning_path: str, tunnel_flags: str) -> List[
                             scanning_path,
                             INVERSE_GREP,
                             tunnel_flags,
+                            catchit_config.case_flag,
+                            catchit_config.includes
                         ],
                         stdout=subprocess.PIPE,
                         stderr=subprocess.PIPE,
-                        timeout=2,
+                        timeout=catchit_config.timeout,
                     )
                     output["findings"] = getFinding_GREP(
                         proc, scanning_path, confidence, entropy
@@ -207,7 +209,7 @@ def exec_find(regexs_json: Dict, scanning_path: str, tunnel_flags: str):
                         ],
                         stdout=subprocess.PIPE,
                         stderr=subprocess.PIPE,
-                        timeout=2,
+                        timeout=catchit_config.timeout,
                     )
                     output["findings"] = getFinding_FIND(
                         proc, scanning_path, confidence
@@ -238,7 +240,7 @@ def shannon_entropy(data: str, iterator: str) -> float:
                 entropy += -p_x * math.log(p_x, 2)
         return entropy
     except Exception:
-        logger.error("error encounterd in calculating shannon entropy")
+        logger.error("error encountered in calculating shannon entropy")
         return 0.0
 
 
@@ -252,11 +254,20 @@ def main():
         default="",
     )
     my_parser.add_argument("--scan-path", help="Path for scan", default="")
+    my_parser.add_argument('--ignore-case', help="Ignore case", default=False, action="store_true")
+    my_parser.add_argument('--timeout', help="Timeout in seconds for grep/find searches.", default=2)
+    my_parser.add_argument('--include', help="Include file pattern. Multiple --include=<filepattern> allowed.",
+                           action="append")
+    my_parser.add_argument('--grep-off', help="Control the grep operation.", default=False, action="store_true")
+    my_parser.add_argument('--find-off', help="Control the find operation.", default=False, action="store_true")
 
     args = vars(my_parser.parse_args())
 
     catchit_config.scanning_path = str(args["scan_path"]) or os.getcwd()
     catchit_config.bash = str(args["bash_path"]) or catchit_config.bash
+    catchit_config.case_flag = "-i" if args["ignore_case"] else ""
+    catchit_config.timeout = int(args["timeout"])
+    catchit_config.includes = ' '.join('--include=%s' % i for i in args["include"]) if args["include"] else ""
 
     # Get the regexs from regexs.json
     with open(FILE_REGEXS, "r") as f:
@@ -267,21 +278,23 @@ def main():
 
     # Starting grep functions to scan for suspicious code
     time_grep = time.time()
-    catchit_output.code = exec_grep(
-        regexs_json, catchit_config.scanning_path, catchit_config.tunnel_flags
-    )
-    catchit_output.summary["execution_time"]["code"] = time.time() - time_grep
+    if args["grep_off"] is False:
+        catchit_output.code = exec_grep(
+            regexs_json, catchit_config.scanning_path, catchit_config.tunnel_flags
+        )
+        catchit_output.summary["execution_time"]["code"] = time.time() - time_grep
 
     # Starting find functions to scan for suspicious files
     time_find = time.time()
-    catchit_output.file = exec_find(
-        regexs_json, catchit_config.scanning_path, catchit_config.tunnel_flags
-    )
-    catchit_output.summary["execution_time"]["file"] = time.time() - time_find
+    if args["find_off"] is False:
+        catchit_output.file = exec_find(
+            regexs_json, catchit_config.scanning_path, catchit_config.tunnel_flags
+        )
+        catchit_output.summary["execution_time"]["file"] = time.time() - time_find
 
     total_block_findings = (
-        catchit_output.summary["findings"]["blocking_code"]
-        + catchit_output.summary["findings"]["blocking_file"]
+            catchit_output.summary["findings"]["blocking_code"]
+            + catchit_output.summary["findings"]["blocking_file"]
     )
 
     catchit_output.summary["execution_time"]["total"] = time.time() - TS_START
