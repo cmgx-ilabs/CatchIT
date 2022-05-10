@@ -52,8 +52,10 @@ _NOTE:_ Commits and pull requests to FINOS repositories will only be accepted fr
 We added some additional options. Example of usage:
 
 ```shell
-$ python3 catchit.py --scan-path ~/build/GitHub  --ignore-case --timeout=200 --include="*.env"  --include="*.txt"
+$ python3 catchit.py --scan-path ~/build/testing  --ignore-case --timeout=200 --include="*.yaml"  --include="*.env"  --include="*.sh"  --find-off
 ```
+
+See python3 catchit.py --help for more details.
 
 ## License
 
